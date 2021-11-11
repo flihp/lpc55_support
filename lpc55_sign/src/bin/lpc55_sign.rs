@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lpc55_support::{crc_image, sign_ecc, signed_image};
+use lpc55_sign::{crc_image, sign_ecc, signed_image};
 use std::path::PathBuf;
 use structopt::StructOpt;
 

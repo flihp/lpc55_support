@@ -6,12 +6,6 @@ use std::convert::TryInto;
 
 #[repr(u8)]
 #[derive(Debug)]
-enum StartByte {
-    StartByte = 0x5A,
-}
-
-#[repr(u8)]
-#[derive(Debug)]
 enum PacketType {
     PacketAck = 0xA1,
     //PacketNak = 0xA2,
@@ -24,7 +18,7 @@ enum PacketType {
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
-enum ResponseCode {
+pub enum ResponseCode {
     GenericResponse = 0xA0,
     ReadMemoryResponse = 0xA3,
     //GetPropertyResponse = 0xA7,
@@ -47,7 +41,7 @@ pub enum KeyType {
 
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
-enum KeyProvisionCmds {
+pub enum KeyProvisionCmds {
     Enroll = 0x0,
     SetUserKey = 0x1,
     SetIntrinsicKey = 0x2,
@@ -60,7 +54,7 @@ enum KeyProvisionCmds {
 // Commands are abbridged right now for what we care about
 #[repr(u8)]
 #[derive(Debug)]
-enum CommandTag {
+pub enum CommandTag {
     FlashEraseAll = 0x1,
     ReadMemory = 0x3,
     WriteMemory = 0x4,
@@ -81,7 +75,7 @@ pub struct PacketHeader {
 impl PacketHeader {
     fn new(ptype: PacketType) -> PacketHeader {
         PacketHeader {
-            start_byte: StartByte::StartByte as u8,
+            start_byte: 0x5A as u8,
             packet_type: ptype as u8,
         }
     }
@@ -340,7 +334,7 @@ fn check_crc(frame_bytes: &Vec<u8>, response: &Vec<u8>, frame: &FramingPacket) -
     Ok(())
 }
 
-fn read_data(port: &mut dyn serialport::SerialPort) -> Result<Vec<u8>> {
+pub fn read_data(port: &mut dyn serialport::SerialPort) -> Result<Vec<u8>> {
     let mut frame_bytes = vec![0; FramingPacket::packed_bytes_size(None)?];
     let mut cnt = 0;
 
@@ -374,7 +368,10 @@ fn read_data(port: &mut dyn serialport::SerialPort) -> Result<Vec<u8>> {
 
 // Okay _technically_ the response can return values from get-property but for
 // now just return (). If we _really_ need properties we can add that later
-fn read_response(port: &mut dyn serialport::SerialPort, response_type: ResponseCode) -> Result<()> {
+pub fn read_response(
+    port: &mut dyn serialport::SerialPort,
+    response_type: ResponseCode,
+) -> Result<()> {
     let mut frame_bytes = vec![0; FramingPacket::packed_bytes_size(None)?];
     let mut cnt = 0;
 
@@ -436,7 +433,7 @@ fn read_response(port: &mut dyn serialport::SerialPort, response_type: ResponseC
     }
 }
 
-fn send_command(
+pub fn send_command(
     port: &mut dyn serialport::SerialPort,
     cmd: CommandTag,
     args: Vec<u32>,
@@ -453,7 +450,7 @@ fn send_command(
     Ok(())
 }
 
-fn send_data(port: &mut dyn serialport::SerialPort, data: Vec<u8>) -> Result<()> {
+pub fn send_data(port: &mut dyn serialport::SerialPort, data: &Vec<u8>) -> Result<()> {
     let mut cnt = 0;
 
     // Target doesn't like it when we send an entire binary in one pass
@@ -476,123 +473,7 @@ fn send_data(port: &mut dyn serialport::SerialPort, data: Vec<u8>) -> Result<()>
     Ok(())
 }
 
-pub fn do_save_keystore(port: &mut dyn serialport::SerialPort) -> Result<()> {
-    let mut args: Vec<u32> = Vec::new();
-
-    // Arg 0 =  WriteNonVolatile
-    args.push(KeyProvisionCmds::WriteNonVolatile as u32);
-    // Arg 1 = Memory ID (0 = internal flash)
-    args.push(0);
-
-    send_command(port, CommandTag::KeyProvision, args)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    Ok(())
-}
-
-pub fn do_enroll(port: &mut dyn serialport::SerialPort) -> Result<()> {
-    let mut args: Vec<u32> = Vec::new();
-
-    // Arg =  Enroll
-    args.push(KeyProvisionCmds::Enroll as u32);
-
-    send_command(port, CommandTag::KeyProvision, args)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    Ok(())
-}
-
-pub fn do_generate_uds(port: &mut dyn serialport::SerialPort) -> Result<()> {
-    let mut args: Vec<u32> = Vec::new();
-
-    // Arg 0 =  SetIntrinsicKey
-    args.push(KeyProvisionCmds::SetIntrinsicKey as u32);
-    // Arg 1 = UDS
-    args.push(KeyType::UDS as u32);
-    // Arg 2 = size
-    args.push(32);
-
-    send_command(port, CommandTag::KeyProvision, args)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    Ok(())
-}
-
-pub fn do_isp_write_keystore(port: &mut dyn serialport::SerialPort, data: Vec<u8>) -> Result<()> {
-    let mut args = Vec::new();
-
-    args.push(KeyProvisionCmds::WriteKeyStore as u32);
-
-    send_command(port, CommandTag::KeyProvision, args)?;
-
-    read_response(port, ResponseCode::KeyProvisionResponse)?;
-
-    send_data(port, data)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    Ok(())
-}
-
-pub fn do_recv_sb_file(port: &mut dyn serialport::SerialPort, data: Vec<u8>) -> Result<()> {
-    let mut args = Vec::new();
-
-    args.push(data.len() as u32);
-
-    send_command(port, CommandTag::ReceiveSbFile, args)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    send_data(port, data)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    Ok(())
-}
-
-pub fn do_isp_set_userkey(
-    port: &mut dyn serialport::SerialPort,
-    key_type: KeyType,
-    data: Vec<u8>,
-) -> Result<()> {
-    let mut args = Vec::new();
-
-    // Arg0 = Set User Key
-    args.push(KeyProvisionCmds::SetUserKey as u32);
-    // Arg1 =  Key type
-    args.push(key_type as u32);
-    // Arg2 = Key size
-    args.push(data.len() as u32);
-
-    send_command(port, CommandTag::KeyProvision, args)?;
-
-    read_response(port, ResponseCode::KeyProvisionResponse)?;
-
-    send_data(port, data)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    Ok(())
-}
-
-pub fn do_isp_read_memory(
-    port: &mut dyn serialport::SerialPort,
-    address: u32,
-    cnt: u32,
-) -> Result<Vec<u8>> {
-    let mut args = Vec::new();
-
-    args.push(address);
-    args.push(cnt);
-    args.push(0x0);
-
-    send_command(port, CommandTag::ReadMemory, args)?;
-
-    read_response(port, ResponseCode::ReadMemoryResponse)?;
-
+pub fn recv_data(port: &mut dyn serialport::SerialPort, cnt: u32) -> Result<Vec<u8>> {
     let mut data = Vec::new();
     let mut received: usize = 0;
 
@@ -602,44 +483,9 @@ pub fn do_isp_read_memory(
         data.extend_from_slice(&d);
 
         received += d.len();
+
+        send_ack(port)?;
     }
 
-    read_response(port, ResponseCode::GenericResponse)?;
-
     Ok(data)
-}
-
-pub fn do_isp_write_memory(
-    port: &mut dyn serialport::SerialPort,
-    address: u32,
-    data: Vec<u8>,
-) -> Result<()> {
-    let mut args = Vec::new();
-
-    args.push(address);
-    args.push(data.len() as u32);
-    args.push(0x0);
-
-    send_command(port, CommandTag::WriteMemory, args)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    send_data(port, data)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    Ok(())
-}
-
-pub fn do_isp_flash_erase_all(port: &mut dyn serialport::SerialPort) -> Result<()> {
-    let mut args: Vec<u32> = Vec::new();
-
-    // Erase internal flash
-    args.push(0x0 as u32);
-
-    send_command(port, CommandTag::FlashEraseAll, args)?;
-
-    read_response(port, ResponseCode::GenericResponse)?;
-
-    Ok(())
 }

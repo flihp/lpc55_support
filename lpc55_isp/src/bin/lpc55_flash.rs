@@ -1,6 +1,7 @@
 use anyhow::Result;
 use byteorder::ByteOrder;
-use lpc55_support::isp::*;
+use lpc55_isp::cmd::*;
+use lpc55_isp::isp::{do_ping, KeyType};
 use serialport::{DataBits, FlowControl, Parity, SerialPortSettings, StopBits};
 use std::io::{Read, Write};
 use std::path::PathBuf;

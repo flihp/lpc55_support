@@ -1,6 +1,7 @@
 use anyhow::Result;
-use lpc55_support::areas::*;
-use lpc55_support::isp::*;
+use lpc55_isp::cmd::{do_isp_read_memory, do_isp_write_memory};
+use lpc55_isp::isp::do_ping;
+use lpc55_sign::areas::*;
 use openssl::sha;
 use packed_struct::prelude::*;
 use serialport::{DataBits, FlowControl, Parity, SerialPortSettings, StopBits};
