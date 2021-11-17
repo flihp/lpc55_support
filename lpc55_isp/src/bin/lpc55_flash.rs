@@ -1,7 +1,8 @@
 use anyhow::Result;
 use byteorder::ByteOrder;
 use lpc55_isp::cmd::*;
-use lpc55_isp::isp::{do_ping, KeyType};
+use lpc55_isp::isp::{do_ping, BootloaderProperty, KeyType};
+use num_traits::cast::FromPrimitive;
 use serialport::{DataBits, FlowControl, Parity, SerialPortSettings, StopBits};
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -82,6 +83,10 @@ enum ISPCommand {
         #[structopt(parse(from_os_str))]
         file: PathBuf,
     },
+    GetProperty {
+        #[structopt(parse(try_from_str))]
+        prop: BootloaderProperty,
+    },
 }
 
 #[derive(Debug, StructOpt)]
@@ -97,6 +102,78 @@ struct ISP {
     baud_rate: u32,
     #[structopt(subcommand)]
     cmd: ISPCommand,
+}
+
+fn pretty_print_bootloader_prop(prop: BootloaderProperty, params: Vec<u32>) {
+    match prop {
+        BootloaderProperty::BootloaderVersion => {
+            println!("Version {:x}", params[1]);
+        }
+        BootloaderProperty::AvailablePeripherals => {
+            println!("Bitmask of peripherals {:x}", params[1]);
+        }
+        BootloaderProperty::FlashStart => {
+            println!("Flash start = 0x{:x}", params[1]);
+        }
+        BootloaderProperty::FlashSize => {
+            println!("Flash Size = {:x}", params[1]);
+        }
+        BootloaderProperty::FlashSectorSize => {
+            println!("Flash Sector Size = {:x}", params[1]);
+        }
+        BootloaderProperty::AvailableCommands => {
+            println!("Bitmask of commands = {:x}", params[1]);
+        }
+        BootloaderProperty::CRCStatus => {
+            println!("CRC status = {}", params[1]);
+        }
+        BootloaderProperty::VerifyWrites => {
+            println!("Verify Writes (bool) {}", params[1]);
+        }
+        BootloaderProperty::MaxPacketSize => {
+            println!("Max Packet Size = {}", params[1]);
+        }
+        BootloaderProperty::ReservedRegions => {
+            println!("Reserved regions? = {:x?}", params);
+        }
+        BootloaderProperty::RAMStart => {
+            println!("RAM start = 0x{:x}", params[1]);
+        }
+        BootloaderProperty::RAMSize => {
+            println!("RAM size = 0x{:x}", params[1]);
+        }
+        BootloaderProperty::SystemDeviceID => {
+            println!("DEVICE_ID0 register = 0x{:x}", params[1]);
+        }
+        BootloaderProperty::SecurityState => {
+            println!(
+                "Security State = {}",
+                if params[1] == 0x5aa55aa5 {
+                    "UNLOCKED"
+                } else {
+                    "LOCKED"
+                }
+            );
+        }
+        BootloaderProperty::UniqueID => {
+            println!(
+                "UUID = {:x}{:x}{:x}{:x}",
+                params[1], params[2], params[3], params[4]
+            );
+        }
+        BootloaderProperty::TargetVersion => {
+            println!("Target version = {:x}", params[1]);
+        }
+        BootloaderProperty::FlashPageSize => {
+            println!("Flash page size = {:x}", params[1]);
+        }
+        BootloaderProperty::IRQPinStatus => {
+            println!("IRQ Pin Status = {}", params[1]);
+        }
+        BootloaderProperty::FFRKeyStoreStatus => {
+            println!("FFR Store Status = {}", params[1]);
+        }
+    }
 }
 
 fn main() -> Result<()> {
@@ -332,6 +409,10 @@ fn main() -> Result<()> {
             println!("Writing keystore");
             // Step 4: Write the keystore to persistent storage
             do_save_keystore(&mut *port)?;
+        }
+        ISPCommand::GetProperty { prop } => {
+            let result = do_isp_get_property(&mut *port, prop)?;
+            pretty_print_bootloader_prop(prop, result);
         }
     }
 

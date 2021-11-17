@@ -231,3 +231,19 @@ pub fn do_isp_flash_erase_all(port: &mut dyn serialport::SerialPort) -> Result<(
 
     Ok(())
 }
+
+pub fn do_isp_get_property(
+    port: &mut dyn serialport::SerialPort,
+    prop: BootloaderProperty,
+) -> Result<Vec<u32>> {
+    let mut args: Vec<u32> = Vec::new();
+
+    // Arg 0 = property
+    args.push(prop as u32);
+
+    send_command(port, CommandTag::GetProperty, args)?;
+
+    let f = read_response(port, ResponseCode::GetPropertyResponse)?;
+
+    Ok(f)
+}
