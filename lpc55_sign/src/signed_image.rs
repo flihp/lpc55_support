@@ -187,6 +187,7 @@ pub fn root_key_table_hash(root_certs: Vec<Vec<u8>>) -> Result<[u8; 32], Error> 
 }
 
 /// Generates a CMPA page
+#[allow(clippy::too_many_arguments)]
 pub fn generate_cmpa(
     dice: DiceArgs,
     enable_secure_boot: bool,
